@@ -1,0 +1,475 @@
+import math
+from datetime import datetime, timedelta
+from typing import List, Dict, Optional
+
+
+class QuickCalc:
+    """Встроенный кредитный калькулятор"""
+
+    def __init__(self):
+        self.loan_history = []
+
+    def calculate_monthly_payment(
+            self,
+            loan_amount: float,
+            annual_rate: float,
+            loan_term_years: int,
+            payment_type: str = "annuity"
+    ) -> Dict:
+        """Рассчитать примерный ежемесячный платёж"""
+        monthly_rate = annual_rate / 100 / 12
+        months = loan_term_years * 12
+
+        if payment_type == "annuity":
+            if monthly_rate == 0:
+                monthly_payment = loan_amount / months
+            else:
+                monthly_payment = loan_amount * monthly_rate * math.pow(1 + monthly_rate, months) / (
+                            math.pow(1 + monthly_rate, months) - 1)
+
+            total_payment = monthly_payment * months
+            overpayment = total_payment - loan_amount
+
+            return {
+                "monthly_payment": round(monthly_payment, 2),
+                "total_payment": round(total_payment, 2),
+                "overpayment": round(overpayment, 2),
+                "payment_type": "аннуитетный",
+                "details": f"Ежемесячный платёж: {round(monthly_payment, 2)} ₽"
+            }
+
+        else:
+            payments = []
+            remaining_debt = loan_amount
+            main_debt_part = loan_amount / months
+            total_payment = 0
+
+            for month in range(1, months + 1):
+                interest_part = remaining_debt * monthly_rate
+                monthly_payment = main_debt_part + interest_part
+                total_payment += monthly_payment
+                payments.append(monthly_payment)
+                remaining_debt -= main_debt_part
+
+            first_payment = payments[0]
+            last_payment = payments[-1]
+            avg_payment = total_payment / months
+            overpayment = total_payment - loan_amount
+
+            return {
+                "first_payment": round(first_payment, 2),
+                "last_payment": round(last_payment, 2),
+                "avg_payment": round(avg_payment, 2),
+                "total_payment": round(total_payment, 2),
+                "overpayment": round(overpayment, 2),
+                "payment_type": "дифференцированный",
+                "details": f"Первый платёж: {round(first_payment, 2)} ₽, последний: {round(last_payment, 2)} ₽"
+            }
+
+    def generate_payment_schedule(
+            self,
+            loan_amount: float,
+            annual_rate: float,
+            loan_term_years: int,
+            start_date: Optional[datetime] = None,
+            payment_type: str = "annuity"
+    ) -> List[Dict]:
+        """Показать график платежей"""
+        if start_date is None:
+            start_date = datetime.now()
+
+        monthly_rate = annual_rate / 100 / 12
+        months = loan_term_years * 12
+
+        schedule = []
+        remaining_debt = loan_amount
+
+        if payment_type == "annuity":
+            if monthly_rate == 0:
+                monthly_payment = loan_amount / months
+            else:
+                monthly_payment = loan_amount * monthly_rate * math.pow(1 + monthly_rate, months) / (
+                            math.pow(1 + monthly_rate, months) - 1)
+
+            for month in range(1, months + 1):
+                interest_part = remaining_debt * monthly_rate
+                main_debt_part = monthly_payment - interest_part
+
+                if month == months:
+                    main_debt_part = remaining_debt
+                    monthly_payment = main_debt_part + interest_part
+
+                remaining_debt -= main_debt_part
+
+                payment_date = start_date + timedelta(days=30 * month)
+
+                schedule.append({
+                    "month": month,
+                    "date": payment_date.strftime("%d.%m.%Y"),
+                    "payment": round(monthly_payment, 2),
+                    "main_debt": round(main_debt_part, 2),
+                    "interest": round(interest_part, 2),
+                    "remaining_debt": round(max(remaining_debt, 0), 2)
+                })
+
+        else:
+            main_debt_part = loan_amount / months
+
+            for month in range(1, months + 1):
+                interest_part = remaining_debt * monthly_rate
+                monthly_payment = main_debt_part + interest_part
+                remaining_debt -= main_debt_part
+
+                payment_date = start_date + timedelta(days=30 * month)
+
+                schedule.append({
+                    "month": month,
+                    "date": payment_date.strftime("%d.%m.%Y"),
+                    "payment": round(monthly_payment, 2),
+                    "main_debt": round(main_debt_part, 2),
+                    "interest": round(interest_part, 2),
+                    "remaining_debt": round(max(remaining_debt, 0), 2)
+                })
+
+        return schedule
+
+    def refinancing_benefit(
+            self,
+            current_loan: Dict,
+            new_rate: float,
+            new_term_years: Optional[int] = None,
+            early_repayment: float = 0
+    ) -> Dict:
+        """Подсказать выгоду рефинансирования"""
+        remaining_debt = current_loan.get('remaining_debt', 0)
+        current_rate = current_loan.get('annual_rate', 0)
+        remaining_months = current_loan.get('remaining_months', 0)
+
+        remaining_debt -= early_repayment
+
+        if new_term_years is None:
+            new_term_years = remaining_months / 12
+
+        monthly_rate_current = current_rate / 100 / 12
+        if monthly_rate_current == 0:
+            current_monthly_payment = remaining_debt / remaining_months
+        else:
+            current_monthly_payment = remaining_debt * monthly_rate_current * math.pow(1 + monthly_rate_current,
+                                                                                       remaining_months) / (
+                                                  math.pow(1 + monthly_rate_current, remaining_months) - 1)
+
+        current_total_payment = current_monthly_payment * remaining_months
+
+        new_months = new_term_years * 12
+        monthly_rate_new = new_rate / 100 / 12
+
+        if monthly_rate_new == 0:
+            new_monthly_payment = remaining_debt / new_months
+        else:
+            new_monthly_payment = remaining_debt * monthly_rate_new * math.pow(1 + monthly_rate_new, new_months) / (
+                        math.pow(1 + monthly_rate_new, new_months) - 1)
+
+        new_total_payment = new_monthly_payment * new_months
+
+        monthly_saving = current_monthly_payment - new_monthly_payment
+        total_saving = current_total_payment - new_total_payment
+
+        benefit_percentage = (total_saving / current_total_payment * 100) if current_total_payment > 0 else 0
+
+        return {
+            "current_monthly_payment": round(current_monthly_payment, 2),
+            "new_monthly_payment": round(new_monthly_payment, 2),
+            "monthly_saving": round(monthly_saving, 2),
+            "total_saving": round(total_saving, 2),
+            "benefit_percentage": round(benefit_percentage, 2),
+            "recommendation": "Рекомендуется рефинансирование" if total_saving > 0 else "Рефинансирование невыгодно"
+        }
+
+
+def get_float_input(prompt: str, default: float = None) -> float:
+    """Получить число с плавающей точкой от пользователя"""
+    while True:
+        try:
+            value = input(prompt)
+            if default is not None and value == "":
+                return default
+            value = float(value.replace(',', '.').replace(' ', ''))
+            if value < 0:
+                print("❌ Значение не может быть отрицательным!")
+                continue
+            return value
+        except ValueError:
+            print("❌ Пожалуйста, введите число!")
+
+
+def get_int_input(prompt: str, default: int = None, min_val: int = 1) -> int:
+    """Получить целое число от пользователя"""
+    while True:
+        try:
+            value = input(prompt)
+            if default is not None and value == "":
+                return default
+            value = int(value)
+            if value < min_val:
+                print(f"❌ Значение должно быть не менее {min_val}!")
+                continue
+            return value
+        except ValueError:
+            print("❌ Пожалуйста, введите целое число!")
+
+
+def get_choice_input(prompt: str, choices: list) -> str:
+    """Получить выбор из вариантов"""
+    while True:
+        choice = input(prompt).lower()
+        if choice in choices:
+            return choice
+        print(f"❌ Пожалуйста, выберите один из: {', '.join(choices)}")
+
+
+def calculate_payment_interactive():
+    """Интерактивный расчет платежа"""
+    print("\n" + "=" * 60)
+    print("РАСЧЕТ ЕЖЕМЕСЯЧНОГО ПЛАТЕЖА")
+    print("=" * 60)
+
+    calc = QuickCalc()
+
+    # Получаем данные от пользователя
+    loan_amount = get_float_input("Введите сумму кредита (руб): ")
+    annual_rate = get_float_input("Введите годовую процентную ставку (%): ")
+    loan_term_years = get_int_input("Введите срок кредита (лет): ", min_val=1)
+
+    print("\nВыберите тип платежа:")
+    print("1 - Аннуитетный (равные платежи каждый месяц)")
+    print("2 - Дифференцированный (платежи уменьшаются каждый месяц)")
+
+    payment_choice = get_choice_input("Ваш выбор (1 или 2): ", ["1", "2"])
+    payment_type = "annuity" if payment_choice == "1" else "diff"
+
+    # Выполняем расчет
+    result = calc.calculate_monthly_payment(
+        loan_amount=loan_amount,
+        annual_rate=annual_rate,
+        loan_term_years=loan_term_years,
+        payment_type=payment_type
+    )
+
+    # Выводим результаты
+    print("\n" + "=" * 60)
+    print("РЕЗУЛЬТАТЫ РАСЧЕТА")
+    print("=" * 60)
+
+    if payment_type == "annuity":
+        print(f"💰 Ежемесячный платёж: {result['monthly_payment']:,.2f} ₽".replace(',', ' '))
+    else:
+        print(f"💰 Первый платёж: {result['first_payment']:,.2f} ₽".replace(',', ' '))
+        print(f"💰 Последний платёж: {result['last_payment']:,.2f} ₽".replace(',', ' '))
+        print(f"💰 Средний платёж: {result['avg_payment']:,.2f} ₽".replace(',', ' '))
+
+    print(f"📊 Общая сумма выплат: {result['total_payment']:,.2f} ₽".replace(',', ' '))
+    print(f"💸 Переплата по кредиту: {result['overpayment']:,.2f} ₽".replace(',', ' '))
+    print(f"📈 Тип платежа: {result['payment_type']}")
+
+    # Показываем график?
+    show_schedule = get_choice_input("\nПоказать график платежей? (да/нет): ", ["да", "нет", "д", "н"])
+
+    if show_schedule in ["да", "д"]:
+        months_to_show = get_int_input("Сколько месяцев показать? (0 - все): ", min_val=0)
+
+        schedule = calc.generate_payment_schedule(
+            loan_amount=loan_amount,
+            annual_rate=annual_rate,
+            loan_term_years=loan_term_years,
+            payment_type=payment_type
+        )
+
+        print("\n" + "=" * 100)
+        print("ГРАФИК ПЛАТЕЖЕЙ")
+        print("=" * 100)
+        print(
+            f"{'Месяц':<8} {'Дата':<12} {'Платёж, ₽':<15} {'Основной долг, ₽':<20} {'Проценты, ₽':<15} {'Остаток долга, ₽':<20}")
+        print("-" * 100)
+
+        if months_to_show == 0 or months_to_show > len(schedule):
+            months_to_show = len(schedule)
+
+        for payment in schedule[:months_to_show]:
+            print(
+                f"{payment['month']:<8} {payment['date']:<12} {payment['payment']:<15.2f} {payment['main_debt']:<20.2f} {payment['interest']:<15.2f} {payment['remaining_debt']:<20.2f}")
+
+        if months_to_show < len(schedule):
+            print(f"... и ещё {len(schedule) - months_to_show} платежей")
+            print(f"📅 Последний платёж: {schedule[-1]['date']} - {schedule[-1]['payment']:,.2f} ₽".replace(',', ' '))
+
+
+def refinancing_interactive():
+    """Интерактивный расчет рефинансирования"""
+    print("\n" + "=" * 60)
+    print("РАСЧЕТ ВЫГОДЫ РЕФИНАНСИРОВАНИЯ")
+    print("=" * 60)
+
+    calc = QuickCalc()
+
+    # Получаем данные о текущем кредите
+    print("\n📋 Введите данные о текущем кредите:")
+    remaining_debt = get_float_input("Остаток долга (руб): ")
+    current_rate = get_float_input("Текущая процентная ставка (%): ")
+    remaining_months = get_int_input("Осталось месяцев выплат: ", min_val=1)
+
+    # Получаем данные о новом кредите
+    print("\n📋 Введите условия рефинансирования:")
+    new_rate = get_float_input("Новая процентная ставка (%): ")
+
+    new_term_choice = get_choice_input(
+        "Оставить тот же срок? (да/нет): ",
+        ["да", "нет", "д", "н"]
+    )
+
+    if new_term_choice in ["нет", "н"]:
+        new_term_years = get_int_input("Новый срок (лет): ", min_val=1)
+        new_term_years = new_term_years
+    else:
+        new_term_years = None
+
+    early_repayment = get_float_input(
+        "Сумма досрочного погашения при рефинансировании (руб, 0 - нет): ",
+        default=0
+    )
+
+    # Создаем объект текущего кредита
+    current_loan = {
+        'remaining_debt': remaining_debt,
+        'annual_rate': current_rate,
+        'remaining_months': remaining_months
+    }
+
+    # Выполняем расчет
+    benefit = calc.refinancing_benefit(
+        current_loan=current_loan,
+        new_rate=new_rate,
+        new_term_years=new_term_years,
+        early_repayment=early_repayment
+    )
+
+    # Выводим результаты
+    print("\n" + "=" * 60)
+    print("РЕЗУЛЬТАТЫ РАСЧЕТА")
+    print("=" * 60)
+
+    print(f"📊 Текущий ежемесячный платёж: {benefit['current_monthly_payment']:,.2f} ₽".replace(',', ' '))
+    print(f"📊 Новый ежемесячный платёж: {benefit['new_monthly_payment']:,.2f} ₽".replace(',', ' '))
+    print(f"💵 Экономия в месяц: {benefit['monthly_saving']:,.2f} ₽".replace(',', ' '))
+    print(f"💰 Общая экономия за весь срок: {benefit['total_saving']:,.2f} ₽".replace(',', ' '))
+    print(f"📈 Экономия в процентах: {benefit['benefit_percentage']:.2f}%")
+
+    print("\n" + "=" * 60)
+    if benefit['total_saving'] > 0:
+        print("✅ РЕКОМЕНДАЦИЯ: Рефинансирование ВЫГОДНО!")
+        print(f"Вы сэкономите {benefit['monthly_saving']:,.2f} ₽ каждый месяц".replace(',', ' '))
+    else:
+        print("❌ РЕКОМЕНДАЦИЯ: Рефинансирование НЕВЫГОДНО")
+        print("Лучше оставить текущие условия кредита")
+
+
+def main_menu():
+    """Главное меню программы"""
+    calc = QuickCalc()
+
+    while True:
+        print("\n" + "=" * 60)
+        print("⚡ КРЕДИТНЫЙ КАЛЬКУЛЯТОР")
+        print("=" * 60)
+        print("1. Рассчитать ежемесячный платёж")
+        print("2. Рассчитать выгоду рефинансирования")
+        print("3. Примеры расчета")
+        print("4. Выйти из программы")
+        print("-" * 60)
+
+        choice = get_choice_input("Выберите действие (1-4): ", ["1", "2", "3", "4"])
+
+        if choice == "1":
+            calculate_payment_interactive()
+        elif choice == "2":
+            refinancing_interactive()
+        elif choice == "3":
+            show_examples(calc)
+        elif choice == "4":
+            print("\nСпасибо за использование кредитного калькулятора! До свидания! 👋")
+            break
+
+        # Спросить, хочет ли пользователь продолжить
+        if choice != "4":
+            continue_choice = get_choice_input("\nХотите выполнить ещё один расчет? (да/нет): ",
+                                               ["да", "нет", "д", "н"])
+            if continue_choice in ["нет", "н"]:
+                print("\nСпасибо за использование кредитного калькулятора! До свидания! 👋")
+                break
+
+
+def show_examples(calc: QuickCalc):
+    """Показать примеры расчета"""
+    print("\n" + "=" * 60)
+    print("ПРИМЕРЫ РАСЧЕТА")
+    print("=" * 60)
+
+    examples = [
+        {
+            "name": "Ипотека на квартиру",
+            "amount": 3000000,
+            "rate": 7.5,
+            "years": 20,
+            "type": "annuity"
+        },
+        {
+            "name": "Автокредит",
+            "amount": 1500000,
+            "rate": 12.9,
+            "years": 5,
+            "type": "annuity"
+        },
+        {
+            "name": "Потребительский кредит",
+            "amount": 500000,
+            "rate": 15.5,
+            "years": 3,
+            "type": "diff"
+        }
+    ]
+
+    for i, example in enumerate(examples, 1):
+        print(f"\n{i}. {example['name']}:")
+        print(f"   Сумма: {example['amount']:,.0f} ₽".replace(',', ' '))
+        print(f"   Ставка: {example['rate']}%")
+        print(f"   Срок: {example['years']} лет")
+
+        result = calc.calculate_monthly_payment(
+            loan_amount=example['amount'],
+            annual_rate=example['rate'],
+            loan_term_years=example['years'],
+            payment_type=example['type']
+        )
+
+        if example['type'] == "annuity":
+            print(f"   Ежемесячный платёж: {result['monthly_payment']:,.2f} ₽".replace(',', ' '))
+        else:
+            print(f"   Первый платёж: {result['first_payment']:,.2f} ₽".replace(',', ' '))
+            print(f"   Последний платёж: {result['last_payment']:,.2f} ₽".replace(',', ' '))
+
+        print(f"   Переплата: {result['overpayment']:,.2f} ₽".replace(',', ' '))
+
+    print("\n" + "=" * 60)
+    print("Хотите рассчитать свой кредит? Выберите пункт 1 в главном меню!")
+
+
+if __name__ == "__main__":
+    try:
+        main_menu()
+    except KeyboardInterrupt:
+        print("\n\nПрограмма прервана пользователем. До свидания!")
+    except Exception as e:
+        print(f"\n⚠️ Произошла ошибка: {e}")
+        print("Пожалуйста, попробуйте снова.")
+    finally:
+        input("\nНажмите Enter для выхода...")
+        
